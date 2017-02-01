@@ -102,6 +102,13 @@ $(function() {
                         var now = new Date().getTime();
                         $('#output').attr('src', '/static/images/out/'+image_id+'_0.jpg?' + now);
                         $('#output_min').attr('src', '/static/images/out_min/'+image_id+'_0.png?' + now);
+					    $('#output_links').html( 
+							"<h4>ダウンロード</h4>"
+							+ "<a href='/static/images/out/" + image_id + "tmp_out.png' target='_blank'>元サイズに拡大</a><br>"
+							+ "<a href='/static/images/out/" + image_id + "med_mult.png' target='_blank'>元サイズで線画と色を合成</a><br>"
+							+ "<a href='/static/images/out/" + image_id + "median_color.png' target='_blank'>元サイズで色のみ（線画部分は白色）</a><br>"
+                			+ "<a href='/static/images/out/" + image_id + "median_color_soft.png' target='_blank'>元サイズで色のみ ソフト（線画部分は白色）</a><br>"
+							);
                         endPaint()
                 }
               });
