@@ -95,7 +95,8 @@ $(function () {
         console.log('uploaded');
         $('#painting_status').hide();
         var now = new Date().getTime();
-        $('#output').attr('src', origin + '/images/out/' + image_id + '_0.jpg?' + now).show();
+        //$('#output').attr('src', origin + '/images/out/' + image_id + '_0.jpg?' + now).show();
+        $('#output').attr('src', origin + '/images/out/' + image_id + 'tmp_out.png?' + now).show();
         $('#output_min').attr('src', origin + '/images/out_min/' + image_id + '_0.png?' + now).show();
         $('#output_links').html( 
 							"<h4>Download</h4>"
