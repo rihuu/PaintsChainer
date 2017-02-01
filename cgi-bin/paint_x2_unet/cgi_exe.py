@@ -9,7 +9,7 @@ import six
 import os
 import cv2
 
-from PIL import Image
+from PIL import Image, ImageChops, ImageOps
 
 from chainer import cuda, optimizers, serializers, Variable
 from chainer import training
@@ -51,7 +51,8 @@ class Paintor:
         array = array.transpose(1,2,0)
         array = np.clip(array,0,255)
         img = np.uint8(array)      
-        img = cv2.cvtColor( img , cv2.COLOR_YUV2BGR )
+        #img = cv2.cvtColor( img , cv2.COLOR_YUV2BGR )
+        img = cv2.cvtColor( img , cv2.COLOR_YUV2RGB )
         cv2.imwrite( name , img )
         
 
@@ -134,6 +135,72 @@ class Paintor:
 
         self.save_as_img( output[0], self.outdir + id_str +"_"+ str(0) + ".jpg" )
 
+        ### custom
+        #img_out = Image.open(self.outdir + id_str +"_"+ str(0) + ".jpg")
+        img_out = cv2.imread(self.outdir + id_str +"_"+ str(0) + ".jpg")
+
+        # line image is original resolution
+        img_line = Image.open(self.root+"line/" + id_str + ".png");
+        img_line = img_line.convert("RGB")
+
+        img_out = cv2.resize(img_out, img_line.size, interpolation = cv2.INTER_CUBIC)
+        #img_out.save(self.root+"tmp_out.png")
+        cv2.imwrite(self.root+"tmp_out.png", img_out)
+        #img_out.save(self.root+ "out/"+id_str + "tmp_out.png")
+        cv2.imwrite(self.root+ "out/"+id_str + "tmp_out.png", img_out)
+
+        del img_out
+
+        # median out mult
+        img_tmp_out = cv2.imread(self.root+ "out/"+id_str + "tmp_out.png")
+        img_med = cv2.medianBlur(img_tmp_out, ksize=5)
+        cv2.imwrite(self.root+"median_out.png", img_med)
+        cv2.imwrite(self.root+ "out/"+id_str + "median_out.png", img_med)
+
+        img_out = Image.open(self.root+ "out/"+id_str + "median_out.png")
+
+        img_mult = ImageChops.multiply(img_out, img_line)
+        img_mult.save(self.root+"med_mult.png")
+        img_mult.save(self.root+ "out/"+id_str + "med_mult.png")
+
+        # multiply
+        #img_out = Image.open(self.root+"tmp_out.png")
+        #img_mult = ImageChops.multiply(img_out, img_line)
+        #img_mult.save(self.root+"mult.png")
+
+        del img_mult
+
+        # output only color
+        img_line = ImageOps.invert(img_line)
+        #img_line = img_line.resize(img_out.size)
+
+        #img_sub = ImageChops.subtract(img_out, img_line)
+        img_add = ImageChops.add(img_out, img_line)
+        img_add.save(self.root+"color.png")
+        img_add.save(self.root+ "out/"+id_str + "color.png")
+
+        del img_out, img_line, img_add
+
+        # median to color
+        img_color = cv2.imread(self.root+ "out/"+id_str + "color.png")
+        img_med = cv2.medianBlur(img_color, ksize=5)
+        cv2.imwrite(self.root+"median_color.png", img_med)
+        cv2.imwrite(self.root+ "out/"+id_str + "median_color.png", img_med)
+
+        # median color mult
+        #img_line = Image.open(self.root+"line/" + id_str + ".png");
+        #img_line = img_line.convert("RGB")
+        #img_out = Image.open(self.root+"median_color.png")
+        #img_mult = ImageChops.multiply(img_out, img_line)
+        #img_mult.save(self.root+"med_mult_color.png")
+
+        # median color soft
+        img_med = cv2.imread(self.root+ "out/"+id_str + "median_color.png")
+        img_soft = cv2.GaussianBlur(img_med, (15,15), 1)
+        cv2.imwrite(self.root+"median_color_soft.png", img_soft)
+        cv2.imwrite(self.root+ "out/"+id_str + "median_color_soft.png", img_soft)
+
+        #self.save_as_img( output[0], self.outdir + id_str +"_"+ str(0) + ".jpg" )
 
 if __name__ == '__main__':
     for n in range(1):
