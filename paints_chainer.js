@@ -1,4 +1,5 @@
-var image_id;
+var image_id
+var origin = '';
 
 // cf. https://github.com/websanova/wPaint/blob/master/src/wPaint.js#L243
 $.fn.wPaint.extend({
@@ -26,8 +27,8 @@ $(function () {
   $('#img_pane').show(); // for $.fn.wPaint
   $('#wPaint').wPaint({
     path: '/wPaint/',
-    menuOffsetLeft: -35,
-    menuOffsetTop: -50
+    menuOffsetLeft: 0,
+    menuOffsetTop: -45
   });
   $('#img_pane').hide();
 
@@ -73,15 +74,45 @@ $(function () {
     return idstr;
   }
 
-  function paint(data) {
-    var origin = '';
-    if (location.hostname === 'paintschainer.preferred.tech') {
-      origin = 'http://paintschainer' + (Math.floor(Math.random() * 5) + 1) + '.preferred.tech'; // 1 ~ 5
-    }
+  function post(data) {
+ 
     $.ajax({
       type: 'POST',
       url: origin + '/post',
       data: data,
+      cache: false,
+      contentType: false,
+      processData: false,
+      dataType: 'text', // server response is broken
+      beforeSend: function () {
+        $('#painting_status').attr('class', '').text('NOW UPLOADING ...').show();
+        $('#submit').prop('disabled', true);
+        console.log('coloring start');
+      },
+      success: function () {
+        console.log('uploaded');
+        paint(data.id)
+      },
+      error: function () {
+        $('#painting_status').attr('class', 'text-error').text('UPLOAD ERROR').show();
+        $('#submit').prop('disabled', false);
+      },
+      complete: function () {
+        console.log('post finish');
+      }
+    });
+  }
+
+
+
+  function paint(id) {
+    var ajaxData = new FormData();
+      ajaxData.append('id', image_id)   
+    
+    $.ajax({
+      type: 'POST',
+      url: origin + '/paint',
+      data: ajaxData,
       cache: false,
       contentType: false,
       processData: false,
@@ -121,27 +152,31 @@ $(function () {
     xhr.onload = function () {
       fn(xhr.response);
     };
-    xhr.responseType = 'blob';
     xhr.open('GET', url);
+    xhr.responseType = 'blob';
     xhr.send();
   }
 
   function colorize(new_image_id) {
     $('#wPaint').wPaint('imageCanvas').toBlob(function (ref_blob) {
-      if (ref_blob.size > 30000) {
-        alert('file size over');
-        return;
-      }
-      var ajaxData = new FormData();
+     var ajaxData = new FormData();
       ajaxData.append('id', new_image_id || image_id);
       ajaxData.append('blur', $('#blur_k').val());
       ajaxData.append('ref', ref_blob);
       if ( new_image_id ) {
         image_id = new_image_id;
+        origin = '';
+        if (location.hostname === 'paintschainer.preferred.tech') {
+            origin = 'http://paintschainer' + (Math.floor(Math.random() * 5) + 1) + '.preferred.tech'; // 1 ~ 5
+        }
       }
       blobUrlToBlob($('#background').attr('src'), function (line_blob) {
         ajaxData.append('line', line_blob);
-        paint(ajaxData);
+        if (line_blob.size > 1000000) {
+           alert('Image too large to colorize');
+           return;
+        }
+        post(ajaxData);
       });
     });
   };

@@ -1,12 +1,10 @@
 #!/usr/bin/env python
 
 import http.server
-import socketserver
 
 import os
 import sys
 import time
-import json
 import re
 
 import argparse
@@ -18,29 +16,15 @@ from urllib.parse import parse_qs
 # sys.path.append('./cgi-bin/wnet')
 sys.path.append('./cgi-bin/paint_x2_unet')
 import cgi_exe
-
-if os.name == 'nt':
-    WK_VER_ROOT = r'C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0'
-    WK_INCLUDE = WK_VER_ROOT + r'\ucrt'
-    WK_LIB_UM = WK_VER_ROOT + r'\um'
-    WK_LIB_UCRT64 = WK_VER_ROOT + r'\ucrt\x64'
-
-    if os.path.isdir(WK_INCLUDE):
-        os.environ['INCLUDE'] = WK_INCLUDE
-    else:
-        print('Include Path for Windows Kit not exists: ' + WK_INCLUDE)
-
-    if os.path.isdir(WK_LIB_UM) and os.path.isdir(WK_LIB_UCRT64):
-        os.environ['LIB'] = WK_LIB_UM + ';' + WK_LIB_UCRT64
-    else:
-        print('Lib Path for Windows Kit not exists: ' + WK_LIB_UM + ';' + WK_LIB_UCRT64)
-
+sys.path.append('./cgi-bin/helpers')
+from platformAdapter import OSHelper
 
 class MyHandler(http.server.CGIHTTPRequestHandler):
 
     t = []
 
     def __init__(self, req, client_addr, server):
+        OSHelper.detect_environment()
         http.server.CGIHTTPRequestHandler.__init__(
             self, req, client_addr, server)
 
@@ -58,11 +42,24 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             postvars = {}
         return postvars
 
+    def log_t(self):
+        if( args.debug ):
+            self.t.append(time.time())
+        return
+
+    def print_log(self):
+        if( args.debug ):
+            for i, j in zip(self.t, self.t[1:]):
+                print("time [sec]", j - i)
+                self.t = []
+        return
+
+
+
     def do_POST(self):
-        
-        self.t.append(time.time())
+        self.log_t()
         form = self.parse_POST()
-        self.t.append(time.time())
+        self.log_t()
 
         if "id" in form:
             id_str = form["id"][0]
@@ -70,6 +67,16 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         else:
             self.ret_result(False)
             return
+
+        if( re.search('/post/*', self.path) != None ):
+            self.post_process( form, id_str )
+        elif ( re.search('/paint/*', self.path) != None ):
+            self.paint_process( form, id_str )
+        else:
+            self.ret_result(False)
+        return
+
+    def post_process(self, form, id_str):
 
         if "line" in form:
             bin1 = form["line"][0]
@@ -89,6 +96,15 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             self.ret_result(False)
             return
 
+        self.log_t()
+        self.ret_result(True)
+        self.log_t()
+        self.print_log()
+
+        return
+
+    def paint_process(self, form, id_str):
+
         blur = 0
         if "blur" in form:
             blur = form["blur"][0].decode()
@@ -97,22 +113,17 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             except ValueError:
                 blur = 0
 
-        self.t.append(time.time())
-        if "step" in form:
-            if form["step"][0].decode() == "S":
-                painter.colorize_s(id_str, blur=blur)
-            if form["step"][0].decode() == "L":
-                painter.colorize_l(id_str)
-        else:
-            painter.colorize(id_str, blur=blur)
+        self.log_t()
+        painter.colorize(id_str, form["step"][0].decode() if "step" in form else "C", blur=blur)
 
-        self.t.append(time.time())
+        self.log_t()
         self.ret_result(True)
-        self.t.append(time.time())
-        for i, j in zip(self.t, self.t[1:]):
-            print("time [sec]", j - i)
+        self.log_t()
+        self.print_log()
 
         return
+
+
 
     def ret_result(self, success):
         if success:
@@ -125,25 +136,34 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             self.send_response(503)
         self.send_header("Content-type", "application/json")
         self.send_header("Content-Length", len(content))
-        self.send_header("Access-Control-Allow-Origin", "http://paintschainer.preferred.tech") # hard coding...
+        self.send_header("Access-Control-Allow-Origin", "*")  # hard coding...
         self.end_headers()
         self.wfile.write(content)
-        self.t.append(time.time())
+        self.log_t()
 
+# set args 
 
 parser = argparse.ArgumentParser(
     description='chainer line drawing colorization server')
 parser.add_argument('--gpu', '-g', type=int, default=0,
                     help='GPU ID (negative value indicates CPU)')
+parser.add_argument('--mode', '-m', default="stand_alone",
+                    help='set process mode')
+# other mode "post_server" "paint_server"
+
 parser.add_argument('--port', '-p', type=int, default=8000,
                     help='using port')
+parser.add_argument('--debug', dest='debug', action='store_true')
+parser.set_defaults(feature=False)
+
 parser.add_argument('--host', '-ho', default='localhost',
                     help='using host')
+
 args = parser.parse_args()
 
-print('GPU: {}'.format(args.gpu))
-
-painter = cgi_exe.Painter(gpu=args.gpu)
+if( args.mode == "stand_alone" or args.mode == "paint_server" ):
+    print('GPU: {}'.format(args.gpu))
+    painter = cgi_exe.Painter(gpu=args.gpu)
 
 httpd = http.server.HTTPServer((args.host, args.port), MyHandler)
 print('serving at', args.host, ':', args.port, )

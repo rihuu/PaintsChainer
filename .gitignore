@@ -1,2 +1,4 @@
-/images/**/*.png
+.idea
+.pyc
+__pycache__/images/**/*.png
 /images/**/*.jpg
